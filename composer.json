@@ -1,0 +1,33 @@
+{
+  "name": "cabp/quickmart",
+  "description": "Jerry's Quick Mart Solution",
+  "keywords": [
+    "php",
+    "api",
+    "Carlos Bucheli"
+  ],
+  "license": "MIT",
+  "type": "proprietary",
+  "authors": [
+    {
+      "name": "Carlos Bucheli",
+      "email": "cabp@carlos-bucheli.com",
+      "homepage": "https://carlos-bucheli.com"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "App\\": "src/"
+    }
+  },
+  "require": {
+    "php": ">=8.0.9",
+    "ext-http": "*",
+    "psr/http-server-middleware": "^1.0"
+  },
+  "config": {
+    "preferred-install": "dist",
+    "sort-packages": true,
+    "optimize-autoloader": true
+  }
+}

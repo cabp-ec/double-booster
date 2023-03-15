@@ -1,0 +1,32 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# IDE
+.idea/
+.vscode/
+
+# Composer
+vendor/
+
+# Other
+/coverage/
+/lib/
+.phpunit.result.cache
+
+# Applications
+*.app
+*.exe
+*.war
+
+# Large media files
+*.mp4
+*.tiff
+*.avi
+*.flv
+*.mov
+*.wmv
+
