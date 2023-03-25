@@ -1,9 +1,14 @@
 {
-  "name": "cabp/quickmart",
-  "description": "Jerry's Quick Mart Solution",
+  "name": "cabp/website",
+  "description": "Carlos's Website",
   "keywords": [
     "php",
+    "php8",
     "api",
+    "rpc",
+    "react",
+    "Carlos",
+    "Bucheli",
     "Carlos Bucheli"
   ],
   "license": "MIT",
@@ -21,9 +26,12 @@
     }
   },
   "require": {
-    "php": ">=8.0.9",
-    "ext-http": "*",
-    "psr/http-server-middleware": "^1.0"
+    "php": ">=8.2.0",
+    "laminas/laminas-diactoros": "^2.24",
+    "psr/http-server-middleware": "^1.0",
+    "relay/relay": "^2.1",
+    "twig/twig": "^3.5",
+    "vlucas/phpdotenv": "^5.5"
   },
   "config": {
     "preferred-install": "dist",

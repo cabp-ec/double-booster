@@ -4,86 +4,195 @@ declare(strict_types=1);
 
 namespace App\Core;
 
-use App\Interfaces\HttpControllerInterface;
-use App\Interfaces\RouteHandlerInterface;
+use App\Core\Interfaces\HttpControllerInterface;
+use App\Core\Interfaces\HttpResponseAdapterInterface;
+use App\Core\Traits\ContentTypeNegotiationTrait;
+use App\Factories\ControllerFactory;
+use Laminas\Diactoros\ServerRequestFactory;
 
-final class Router extends ConfigReceptor implements RouteHandlerInterface
+final class Router extends ConfigReceptor
 {
-    private const SEGMENT_API = 'api';
-    private const SEGMENT_WEB = 'web';
-    private const KEY_OPEN_CHAR = 'paramOpenChar';
-    private const KEY_CLOSE_CHAR = 'paramCloseChar';
-    private const ACTION_SUFFIX = 'Action';
-    private const CONTROLLER_SUFFIX = 'Controller';
-    private const CONTROLLER_CLASS_SIGNATURE = 'App\Http\Controllers';
-    private const API_VERSIONS_AVAIL = [1, 2]; // TODO: use a .env file for this
-    private const ROUTE_DEFINITION_404 = [
-        'module' => 'Core',
-        'method' => [
-            'GET' => [
-                'protected' => false,
-                'controller' => 'Index',
-                'action' => 'notFound',
-                'middleware' => 'ROUTE',
-            ],
-            'POST' => [
-                'protected' => false,
-                'controller' => 'Index',
-                'action' => 'notFound',
-                'middleware' => 'ROUTE',
-            ],
-        ],
+    use ContentTypeNegotiationTrait;
+
+    private const ACTION_SUFFIX = 'actionSuffix';
+    private const KEY_REST_ACTIONS = 'restActions';
+    private const VERSION_URI = '/{version}';
+    private const HTTP_METHOD_GET = 'GET';
+    private const HTTP_METHOD_POST = 'POST';
+    private const HTTP_METHOD_PUT = 'PUT';
+    private const HTTP_METHOD_DELETE = 'DELETE';
+    private const REST_OP_C = 'create';
+    private const REST_OP_R = 'read';
+    private const REST_OP_U = 'update';
+    private const REST_OP_D = 'delete';
+    private const REST_OP_A = 'all';
+    private const REST_OP_F = 'filter';
+    private const CONTROLLER_SIGNATURE_BASE = 'App\Http\Controllers\\';
+    private const CONTROLLER_SIGNATURE_SUFFIX = '\%sController';
+    private const DEFAULT_CONTROLLER_CLASS = 'App\Http\Controllers\DefaultController';
+    private const NOT_FOUND_ACTION = 'notFoundAction';
+
+    private const REST_OPS_METHODS = [
+        self::REST_OP_C => self::HTTP_METHOD_POST,
+        self::REST_OP_R => self::HTTP_METHOD_GET,
+        self::REST_OP_U => self::HTTP_METHOD_PUT,
+        self::REST_OP_D => self::HTTP_METHOD_DELETE,
+        self::REST_OP_A => self::HTTP_METHOD_GET,
+        self::REST_OP_F => self::HTTP_METHOD_POST,
     ];
+
+    private const ROUTE_DEFINITION_404 = [
+        'protected' => false,
+        'controller' => 'Index',
+        'action' => 'notFound',
+        'pipeline' => 'ROUTE',
+    ];
+    public const ERROR_DETAIL_404 = [
+        'title' => 'Not Found',
+        'caption' => null,
+        'message' => 'The resource you\'re looking for does not exist',
+    ];
+
+    public const CONTENT_TYPE = 'Content-Type';
+    public const CONTENT_TYPE_HTML = 'text/html';
+    public const CONTENT_TYPE_XML = 'application/xhtml+xml';
+    public const CONTENT_TYPE_JSON = 'application/json';
+
+    public const SEGMENT_WEB = 'web';
+    public const SEGMENT_REST = 'rest';
+    public const SEGMENT_RPC = 'rpc';
+
+    public const SEGMENT_WEB_CONTENT_TYPE = self::CONTENT_TYPE_HTML;
+    public const SEGMENT_REST_CONTENT_TYPE = self::CONTENT_TYPE_JSON;
+    public const SEGMENT_RPC_CONTENT_TYPE = self::CONTENT_TYPE_JSON;
+
+    public const SEGMENTS_CONTENT_TYPES = [
+        Router::SEGMENT_WEB => Router::SEGMENT_WEB_CONTENT_TYPE,
+        Router::SEGMENT_REST => Router::SEGMENT_REST_CONTENT_TYPE,
+        Router::SEGMENT_RPC => Router::SEGMENT_RPC_CONTENT_TYPE,
+    ];
+
+    public const SEGMENTS_CONTENT_NEGOTIABLE = [
+        Router::SEGMENT_WEB => false,
+        Router::SEGMENT_REST => false,
+        Router::SEGMENT_RPC => false,
+    ];
+
+    public const ACCEPTABLE_CONTENT_TYPES = [
+        'text/html',
+        'application/xhtml+xml',
+        'application/xml',
+        self::CONTENT_TYPE_JSON,
+    ];
+
+    public const SEGMENT_API = 'api';
     public const DEFAULT_ACCEPT_HEADER = 'text/html';
 
+    private array $config;
     private array $routes = [];
-    private array $workersFree = [];
-    private array $workersOccupied = [];
+    private MiddlewareHandler $middlewareHandler;
 
     /**
-     * The Router class
+     * Constructor for the Router class
      *
-     * @param array $routes
      * @param array $config
-     * @param Middleware $middlewarePool
-     * @param Container $container
+     * @param array $routes
+     * @param array $middlewarePipelines
+     * @param ControllerFactory $controllerFactory
      */
     public function __construct(
-        array              $routes,
-        private array      $config,
-        private Middleware $middlewarePool,
-        private Container  $container
+        array                              $config,
+        array                              $routes,
+        array                              $middlewarePipelines,
+        private readonly ControllerFactory $controllerFactory
     )
     {
+        $this->config = $config;
         $this->configCleanUp($routes, $this->routes);
+        $this->middlewareHandler = new MiddlewareHandler($middlewarePipelines);
     }
 
     /**
-     * Clean-up a single route definition
+     * Clean-up a default route definition
      *
-     * @param array $definition
+     * @param string $segment
+     * @param array $definitions
      * @return array
      */
-    private function cleanUpRouteDefinition(array $definition): array
+    private function cleanUpDefaultRouteDefinition(string $segment, array $definitions): array
     {
-        // TODO: update so as we can grab a distinguish core from module
+        return $definitions;
+    }
 
+    /**
+     * Clean-up a REST route definition
+     *
+     * @param string $segment
+     * @param string $uri
+     * @param array $definition
+     * @param array $clean
+     * @return void
+     */
+    private function cleanUpRestRouteDefinition(string $segment, string $uri, array $definition, array &$clean): void
+    {
         // 1. Find controller and method
-        $signatureTpl = 'App\Http\Controllers\%sController';
-        $methods = array_keys($definition['method']);
+        $signatureTpl = self::CONTROLLER_SIGNATURE_BASE . $segment . self::CONTROLLER_SIGNATURE_SUFFIX;
 
-        foreach ($methods as $methodKey) {
-            $methodDefinition = $definition['method'][strtoupper($methodKey)];
-            $controllerSignature = sprintf($signatureTpl, $methodDefinition['controller']);
-            $methodName = $methodDefinition['action'] . $this->config['actionSuffix'];
+        if ($uri === self::VERSION_URI) {
+            $clean[$uri] = $definition;
+        } else {
+            $controllerName = ucfirst(strtolower($definition['controller']));
+            $controllerSignature = sprintf($signatureTpl, $controllerName);
+            $operationActions = [
+                self::REST_OP_C => $this->config[self::KEY_REST_ACTIONS]['C'] . $this->config[self::ACTION_SUFFIX],
+//                self::REST_OP_R => $this->config[self::KEY_REST_ACTIONS]['R'] . $this->config[self::ACTION_SUFFIX],
+                self::REST_OP_U => $this->config[self::KEY_REST_ACTIONS]['U'] . $this->config[self::ACTION_SUFFIX],
+                self::REST_OP_D => $this->config[self::KEY_REST_ACTIONS]['D'] . $this->config[self::ACTION_SUFFIX],
+                self::REST_OP_A => $this->config[self::KEY_REST_ACTIONS]['A'] . $this->config[self::ACTION_SUFFIX],
+                self::REST_OP_F => $this->config[self::KEY_REST_ACTIONS]['F'] . $this->config[self::ACTION_SUFFIX],
+            ];
 
-            // 2. Set to 404 if class or method are not found
-            if (!class_exists($controllerSignature) || !method_exists($controllerSignature, $methodName)) {
-                $definition['method'][$methodKey] = self::ROUTE_DEFINITION_404['method'][$methodKey];
+            $definition['action'] = $operationActions[self::REST_OP_C];
+            $clean[$uri] = [self::HTTP_METHOD_GET => $definition];
+
+            foreach ($operationActions as $opKeyword => $operationAction) {
+                $key = "$uri/$opKeyword";
+                $operationMethod = self::REST_OPS_METHODS[$opKeyword];
+                $actionMethod = ucfirst(strtolower($operationAction)) . $this->config[self::ACTION_SUFFIX];
+
+                // 2. Set to 404 if class or method is not found
+                if (!class_exists($controllerSignature) || !method_exists($controllerSignature, $actionMethod)) {
+                    $definition = self::ROUTE_DEFINITION_404;
+                } else {
+                    $definition['action'] = $actionMethod;
+                }
+
+                $clean[$key] = [$operationMethod => $definition];
+            }
+        }
+    }
+
+    /**
+     * Clean-up all routes
+     *
+     * @param string $key
+     * @param array $dirty
+     * @return array
+     */
+    private function routesCleanUp(string $key, array $dirty): array
+    {
+        $clean = [];
+        $segment = ucfirst($key);
+
+        foreach ($dirty as $uri => $dirtyDef) {
+            if ($key === self::SEGMENT_REST) {
+                $this->cleanUpRestRouteDefinition($segment, $uri, $dirtyDef, $clean);
+            } else {
+                $clean[$uri] = $this->cleanUpDefaultRouteDefinition($segment, $dirtyDef);
             }
         }
 
-        return $definition;
+        return $clean;
     }
 
     /**
@@ -91,191 +200,172 @@ final class Router extends ConfigReceptor implements RouteHandlerInterface
      */
     protected function configCleanUp(array $dirty, array &$clean): void
     {
-        $clean = [];
-
-        foreach ($dirty as $group => $routeDefs) {
-            if (!array_key_exists($group, $clean)) {
-                $clean[$group] = [];
-            }
-
-            foreach ($routeDefs as $uri => $dirtyDef) {
-                $clean[$group][$uri] = $this->cleanUpRouteDefinition($dirtyDef);
-            }
-        }
+        $clean = [
+            self::SEGMENT_WEB => $this->routesCleanUp(self::SEGMENT_WEB, $dirty[self::SEGMENT_WEB]),
+            self::SEGMENT_REST => $this->routesCleanUp(self::SEGMENT_REST, $dirty[self::SEGMENT_REST]),
+            self::SEGMENT_RPC => $this->routesCleanUp(self::SEGMENT_RPC, $dirty[self::SEGMENT_RPC]),
+        ];
     }
 
     /**
-     * @inheritDoc
+     * Find the route definition for the request
+     *
+     * @param string $groupKey
+     * @param string $uri
+     * @param bool $routeFound
+     * @return array
      */
-    public function get(string $uri, array $definition): HttpControllerInterface
+    private function findRouteDefinition(string $groupKey, string $uri, bool &$routeFound): array
     {
-        // TODO: update this method so as we can grab a controller from a module
-        $methodKeys = array_keys($definition['method']);
-        $methodDefinition = $definition['method'][$methodKeys[0]];
+        $uriKeys = array_keys($this->routes[$groupKey]);
+        $groupKeyFirst = substr($groupKey, 0, 1);
 
-        /** @var HttpControllerInterface $worker */
-        $worker = null;
-        $classSignature = self::CONTROLLER_CLASS_SIGNATURE . '\\' . $methodDefinition['controller'] . self::CONTROLLER_SUFFIX;
-
-        if (count($this->workersFree) === 0) {
-            try {
-                $worker = (new \ReflectionClass($classSignature))->newInstanceArgs([$this->container]);
-            } catch (\ReflectionException $e) {
-                // TODO: catch this exception with our own error/exception handler
-            }
-        } else {
-            $worker = array_pop($this->workersFree);
+        if (in_array($uri, $uriKeys)) { // found exact match
+            return $this->routes[$groupKey][$uri];
         }
 
-        $this->workersOccupied[spl_object_hash($worker)] = $worker;
+        $segments = explode('/', strtolower($uri));
+        $apiSegment = '/' . self::SEGMENT_API . '/';
+        $apiStart = $apiSegment . $groupKeyFirst . '/';
+        $uriRest = $uri;
+        $isApi = str_starts_with($uri, $apiSegment);
 
-        return $worker;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function dispose(HttpControllerInterface $worker): void
-    {
-        $hash = spl_object_hash($worker);
-
-        if (isset($this->workersOccupied[$hash])) {
-            unset($this->workersOccupied[$hash]);
-            $this->workersFree[$hash] = $worker;
-        }
-    }
-
-    private function findMatch(
-        string $gKey,
-        array  $gSegments,
-        array  $segments,
-        array  &$gKeyCount,
-        array  &$gKeyCountValues
-    ): bool
-    {
-        $values = [];
-
-        foreach ($gSegments as $index => $gSegment) {
-            if ($segments[$index] === $gSegment) {
-                $values[] = true;
+        if ($isApi) {
+            if (is_numeric($segments[3])) {
+                $uriRest = substr($uri, strlen($apiStart) - 1);
+            } else {
+                $routeFound = false;
+                return self::ROUTE_DEFINITION_404;
+                // 404, segments[2] MUST be numeric because it's the api {version}
             }
         }
 
-        $gKeyCount[$gKey] = count($values);
-        $gKeyCountValues[$gKey] = $gKey;
+        $matchPool = [];
 
-        return false;
-    }
+        foreach ($uriKeys as $index => $uriKey) {
+            $uriKey = str_replace('{version}', '_API_VERSION_', $uriKey);
+            $paramPattern = ['/_API_VERSION_/', '/\\\{(.*?)\}/'];
+            $paramReplacement = ['(\d+)', '([a-zA-Z0-9\-\_]+)'];
+            $regexKeyUri = '@^' . preg_replace($paramPattern, $paramReplacement, preg_quote($uriKey)) . '$@D';
+            preg_match($regexKeyUri, $uriRest, $matches);
+            array_shift($matches);
 
-    private function extractArgs(string $uri, string $refUri, string $apiVersion): array
-    {
-        $segments = explode('/', $uri);
-        $reference = explode('/', $refUri);
-        $values = [];
-
-        foreach ($reference as $index => $refSegment) {
-            if ($refSegment === '{version}') {
-                $values['version'] = $apiVersion;
+            if (empty($matches)) {
                 continue;
             }
 
-            $start = str_starts_with($refSegment, '{');
-            $end = str_ends_with($refSegment, '}');
-
-            if ($start && $end) {
-                $key = str_replace(['{', '}'], '', $refSegment);
-//                echo $key . ' - ' . $segments[$index] . '<br>';
-                $values[$key] = $segments[$index];
-            }
+            $matchPool[] = $uriKeys[$index];
         }
 
-        return $values;
+        if (empty($matchPool)) {
+            $routeFound = false;
+            return self::ROUTE_DEFINITION_404;
+        }
+
+        $firstMatch = $this->routes[$groupKey][$matchPool[0]];
+        $firstMatchKeys = array_keys($firstMatch);
+        $definitionDetail = $firstMatch[$firstMatchKeys[0]];
+
+        return array_merge_recursive(
+            [
+                'uriRest' => $uriRest,
+                'uriDefinition' => $matchPool[0],
+                'groupKey' => $groupKey,
+            ],
+            $definitionDetail
+        );
     }
 
     /**
-     * @inheritDoc
+     * Get the query string as params
+     *
+     * @param string $uriDefinition
+     * @param string $uriRest
+     * @return array
      */
-    public function operate(EncounterPayload $payload): HttpResponse
+    private function getUriParams(string $uriDefinition, string $uriRest): array
     {
-        // TODO: separate steps into methods
+        $defSegments = explode('/', $uriDefinition);
+        $restSegments = explode('/', $uriRest);
+        $params = [];
 
-        // 1. Check if it's a web or api route
-        $uri = $payload->getUri();
-        $segments = explode('/', $uri);
-        $isApi = (isset($segments[1]) && isset($segments[2])) && $segments[1] === self::SEGMENT_API;
-        $apiVersion = $isApi ? ($segments[2] ?? null) : null;
-        $groupKey = $isApi ? self::SEGMENT_API : self::SEGMENT_WEB;
-
-        // 2. Extract parameters from the rest of segments
-        // TODO: transform segments into arguments
-        $groupDefinitions = $this->routes[$groupKey];
-        $groupKeys = array_keys($this->routes[$groupKey]);
-        $groupSegments = [];
-
-        if ($isApi) {
-            $segments = array_splice($segments, 1);
-            $segments[0] = '';
-            $segments[1] = '{version}';
-        }
-
-        $keyUri = implode('/', $segments);
-        $totalSegments = count($segments);
-        $gKeyCount = [];
-        $gKeyCountValues = [];
-
-        foreach ($groupKeys as $index => $gKey) {
-            $gSegments = explode('/', $gKey);
-
-            if ($keyUri === $gKey) {
-//                echo $keyUri . ' === ' . $gKey . '<br>';
-                $groupSegments[$gKey] = $gSegments;
-                break;
-            } else if (count($gSegments) === $totalSegments) {
-                $this->findMatch($gKey, $gSegments, $segments, $gKeyCount, $gKeyCountValues);
+        foreach ($defSegments as $index => $defSegment) {
+            if (str_starts_with($defSegment, '{') && str_ends_with($defSegment, '}')) {
+                $defSegment = str_replace(['{', '}'], '', $defSegment);
+                $params[$defSegment] = $restSegments[$index];
             }
         }
 
-        $definitionKey = $keyUri;
+        return $params;
+    }
 
-        if (empty($groupSegments)) {
-            $k = array_keys($gKeyCount);
-            $v = array_values($gKeyCount);
-            $x = max($v);
-            $i = array_search($x, $v);
-            $definitionKey = $k[$i];
+    /**
+     * Get the proper controller to handle the request
+     *
+     * @param string $groupKey
+     * @param array $routeDefinition
+     * @return HttpControllerInterface
+     */
+    private function getController(string $groupKey, array $routeDefinition): HttpControllerInterface
+    {
+        $segment = ucfirst($groupKey) . '\\';
+        $className = self::CONTROLLER_SIGNATURE_BASE . $segment . $routeDefinition['controller'] . 'Controller';
+
+        return $this->controllerFactory->get($className);
+    }
+
+    /**
+     * Get the proper action name for the given controller
+     *
+     * @param HttpControllerInterface $controller
+     * @param string $actionName
+     * @param bool $routeFound
+     * @return string
+     */
+    private function getControllerAction(HttpControllerInterface $controller, string $actionName, bool $routeFound): string
+    {
+        if (!$routeFound) {
+            return self::NOT_FOUND_ACTION;
         }
 
-        $routeDefinition = $this->routes[$groupKey][$definitionKey];
-        $params = array_merge_recursive(
-            $this->extractArgs($keyUri, $definitionKey, $apiVersion),
-            $payload->getPostedData()
+        $action = $actionName . 'Action';
+
+        if (method_exists($controller, $action)) {
+            return $action;
+        }
+
+        return self::NOT_FOUND_ACTION;
+    }
+
+    /**
+     * Operate a route with the given payload
+     *
+     * @param EncounterPayload $payload
+     * @return HttpResponseAdapterInterface
+     */
+    public function operate(EncounterPayload $payload): HttpResponseAdapterInterface
+    {
+        $uri = $payload->getUri();
+        $groupKey = $this->getRouteKeySegment($uri);
+        $routeFound = true;
+        $routeDefinition = $this->findRouteDefinition($groupKey, $uri, $routeFound);
+        $arguments = array_merge(
+            ['keySegment' => $groupKey],
+            $routeFound
+                ? $this->getUriParams($routeDefinition['uriDefinition'], $routeDefinition['uriRest'])
+                : []
         );
+        $serverRequest = ServerRequestFactory::fromGlobals([], $arguments, $payload->getPostedData(), [], []);
+        $controller = $this->getController($groupKey, $routeDefinition);
+        $controllerAction = $this->getControllerAction($controller, $routeDefinition['action'], $routeFound);
+        $response = $this->middlewareHandler->run($routeDefinition['pipeline'], $serverRequest);
 
 //        echo '<pre>';
-//        var_dump(json_encode($params));
+//        echo 'Router<br>';
+//        var_dump($controllerAction);
+//        var_dump($controller);
 //        exit;
 
-        // 3. Create a RequestInterface using $params
-        $request = new HttpRequest(
-            $uri,
-            $payload->getRequestMethod(),
-            json_encode($params),
-            $payload->getRequestHeaders()
-        );
-
-        // 4. TODO: Run middleware pipeline
-
-        // 5. Get the worker
-        $worker = $this->get($uri, $routeDefinition);
-
-        // 6. Call worker method (a.k.a. action) using RequestInterface as parameter
-        $methodKeys = array_keys($routeDefinition['method']);
-        $methodDefinition = $routeDefinition['method'][$methodKeys[0]];
-        $methodName = $methodDefinition['action'] . self::ACTION_SUFFIX;
-
-        // 7. Dispose the worker
-        $this->dispose($worker);
-
-        return $worker->$methodName($request);
+        return $controller->$controllerAction($serverRequest, $response);
     }
 }

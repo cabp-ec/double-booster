@@ -1,74 +1,57 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Middleware;
 
-use App\Interfaces\WorkerMiddlewareInterface;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Server\RequestHandlerInterface;
+use App\Core\HttpResponse;
+use App\Core\Interfaces\AppMiddlewareInterface;
+use App\Core\Router;
+use App\Core\Traits\ContentTypeNegotiationTrait;
+use App\Core\Traits\ErrorContentNegotiationTrait;
 
-abstract class BaseMiddleware implements WorkerMiddlewareInterface
+abstract class BaseMiddleware implements AppMiddlewareInterface
 {
-    protected function __construct(private string $key, private WorkerMiddlewareInterface $successor)
+    use ErrorContentNegotiationTrait;
+    use ContentTypeNegotiationTrait;
+
+    protected const DEFAULT_OUTPUT_CONTENT_TYPE = Router::ACCEPTABLE_CONTENT_TYPES[0];
+    protected const ERROR_OUTPUT_CAPTION = 'YOU SHALL NOT PASS!!!';
+    protected const ERROR_OUTPUT_MESSAGE = 'Resource is not allowed for public use.';
+    protected const ERROR_OUTPUT = [
+        self::ERROR_OUTPUT_CAPTION,
+        self::ERROR_OUTPUT_MESSAGE,
+    ];
+
+    /**
+     * Get an standard error HTTP response
+     *
+     * @param string $type
+     * @param string $contentType
+     * @param int $status
+     * @return HttpResponse
+     */
+    protected function getErrorResponse(string $type, string $contentType, int $status): HttpResponse
     {
+        $response = new HttpResponse();
+        $response->writeBody($this->getErrorBody($type, $contentType));
+
+        return $response
+            ->withHeader(HttpResponse::HEADER_CONTENT_TYPE, $contentType)
+            ->withStatus($status);
     }
 
     /**
      * @inheritDoc
      */
-    final public function getParentKey(): string
+    public function getErrorBody(string $type, string $contentType): string
     {
-        return $this->key;
+        $error = array_merge([$type], self::ERROR_OUTPUT);
+
+        return match ($contentType) {
+            Router::ACCEPTABLE_CONTENT_TYPES[1], Router::ACCEPTABLE_CONTENT_TYPES[2] => $this->getErrorAsXml($error),
+            Router::ACCEPTABLE_CONTENT_TYPES[3] => $this->getErrorAsJson($error),
+            default => $this->getErrorAsHtml($error),
+        };
     }
-
-    /**
-     * @inheritDoc
-     */
-    public function getKey(): string
-    {
-        return $this->key;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function setParentKey(string $value): void
-    {
-        $this->key = $value;
-    }
-
-    /**
-     * @inheritDoc
-     */
-    final public function setKey(string $value): void
-    {
-        $this->key = $value;
-    }
-
-    /**
-     * This approach by using a template method pattern ensures you that
-     * each subclass will not forget to call the successor
-     */
-    final public function handle(RequestInterface $request): ?string
-    {
-        $processed = $this->processing($request);
-
-        if ($processed) {
-            // the request has been processed by this handler => see the next
-            $processed = $this->successor->handle($request);
-        }
-
-        return $processed;
-    }
-
-//    abstract protected function processing(RequestInterface $request): bool;
-
-    /**
-     * @inheritDoc
-     */
-    abstract public function process(
-        ServerRequestInterface  $request,
-        RequestHandlerInterface $handler
-    ): ResponseInterface;
 }

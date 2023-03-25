@@ -1,132 +1,55 @@
 <?php
 
-// TODO: use an enum to specify middleware pipelines
+// TODO: upgrade and ENUMS to specify HTTP methods and middleware pipelines
+// TODO: implement protected routes
 
 return [
     '/' => [
-        'module' => 'Core',
-        'method' => [
-            'GET' => [
-                'protected' => false,
-                'controller' => 'Index',
-                'action' => 'index',
-                'middleware' => 'ROUTE',
-            ],
+        'GET' => [
+            'protected' => false,
+            'controller' => 'Index',
+            'action' => 'index',
+            'pipeline' => 'ROUTE',
         ],
     ],
-    '/help' => [
-        'module' => 'Core',
-        'method' => [
-            'GET' => [
-                'protected' => false,
-                'controller' => 'Index',
-                'action' => 'help',
-                'middleware' => 'ROUTE',
-            ],
+    '/content-index' => [
+        'GET' => [
+            'protected' => false,
+            'controller' => 'Index',
+            'action' => 'contentIndex',
+            'pipeline' => 'ROUTE',
         ],
     ],
-    '/login' => [
-        'module' => 'Core',
-        'method' => [
-            'GET' => [
-                'protected' => false,
-                'controller' => 'Index',
-                'action' => 'signIn',
-                'middleware' => 'ROUTE',
-            ],
-//            'POST' => [
-//                'controller' => 'Index',
-//                'action' => 'signInSubmission',
-//                'middleware' => 'FORM_SUBMISSION',
-//            ],
+    '/books' => [
+        'GET' => [
+            'protected' => false,
+            'controller' => 'Index',
+            'action' => 'booksIndex',
+            'pipeline' => 'ROUTE',
         ],
     ],
-    '/logout' => [
-        'module' => 'Core',
-        'method' => [
-            'GET' => [
-                'protected' => false,
-                'controller' => 'Index',
-                'action' => 'signOut',
-                'middleware' => 'ROUTE',
-            ],
+    '/books/{friendlyName}' => [
+        'GET' => [
+            'protected' => false,
+            'controller' => 'Index',
+            'action' => 'bookDetail',
+            'pipeline' => 'ROUTE',
         ],
     ],
-    '/register' => [
-        'module' => 'CRM',
-        'method' => [
-            'GET' => [
-                'protected' => false,
-                'controller' => 'Index',
-                'action' => 'signUp',
-                'middleware' => 'ROUTE',
-            ],
+    '/articles' => [
+        'GET' => [
+            'protected' => false,
+            'controller' => 'Index',
+            'action' => 'articlesIndex',
+            'pipeline' => 'ROUTE',
         ],
     ],
-    '/abandon' => [
-        'module' => 'CRM',
-        'method' => [
-            'GET' => [
-                'protected' => false,
-                'controller' => 'Index',
-                'action' => 'signDown',
-                'middleware' => 'ROUTE',
-            ],
-        ],
-    ],
-    '/cart' => [
-        'module' => 'CRM',
-        'method' => [
-            'GET' => [
-                'protected' => false,
-                'controller' => 'Index',
-                'action' => 'signDown',
-                'middleware' => 'ROUTE',
-            ],
-        ],
-    ],
-    '/checkout' => [
-        'module' => 'CRM',
-        'method' => [
-            'GET' => [
-                'protected' => false,
-                'controller' => 'Index',
-                'action' => 'signDown',
-                'middleware' => 'ROUTE',
-            ],
-        ],
-    ],
-    '/admin' => [
-        'module' => 'Core',
-        'method' => [
-            'GET' => [
-                'protected' => false,
-                'controller' => 'BackOffice',
-                'action' => 'signIn',
-                'middleware' => 'ROUTE',
-            ],
-        ],
-    ],
-    '/admin/logout' => [
-        'module' => 'Core',
-        'method' => [
-            'GET' => [
-                'protected' => true,
-                'controller' => 'BackOffice',
-                'action' => 'dashboard',
-                'middleware' => 'ROUTE',
-            ],
-        ],
-    ],
-    '/back-office' => [
-        'module' => 'Core',
-        'method' => [
-            'GET' => [
-                'protected' => true,
-                'controller' => 'BackOffice',
-                'action' => 'dashboard',
-                'middleware' => 'ROUTE',
-            ],
+    '/articles/{friendlyName}' => [
+        'GET' => [
+            'protected' => false,
+            'controller' => 'Index',
+            'action' => 'articleRead',
+            'pipeline' => 'ROUTE',
         ],
     ],
 ];

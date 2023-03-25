@@ -2,7 +2,8 @@
 .DS_Store
 Thumbs.db
 
-# Log files
+# ENV & Log files
+*.env
 *.log
 
 # IDE

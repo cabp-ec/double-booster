@@ -11,12 +11,12 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use App\Core\HttpResponse;
 
-final class AuthenticationMiddleware extends BaseMiddleware
+final class AuthorizationMiddleware extends BaseMiddleware
 {
     use ErrorContentNegotiationTrait;
     use ContentTypeNegotiationTrait;
 
-    const ERROR_OUTPUT_TYPE = 'AUTHENTICATION';
+    const ERROR_OUTPUT_TYPE = 'AUTHORIZATION';
 
     private bool $shallPass = false;
 

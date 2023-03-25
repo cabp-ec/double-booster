@@ -4,70 +4,96 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Core\Container;
+use App\Core\Interfaces\HttpResponseAdapterInterface;
+use App\Core\Interfaces\ViewsHandlerInterface;
+use App\Core\Interfaces\ContainerInterface;
+use App\Core\Interfaces\HttpControllerInterface;
+use App\Core\ErrorHandler;
 use App\Core\HttpResponse;
 use App\Core\Router;
-use App\Core\Services;
-use App\Core\Session;
-use App\Interfaces\HttpControllerInterface;
-use Exception;
-use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use App\Core\Traits\ContentTypeNegotiationTrait;
+use App\Core\Traits\ErrorContentNegotiationTrait;
 
 abstract class BaseController implements HttpControllerInterface
 {
-    // TODO: use enums instead of or in combination with these constants
-    private const KEY_ACCEPT = 'Accept';
-    private const KEY_CONTENT_TYPE = 'Content-Type';
-    private const CONTENT_TYPE_JSON = 'application/json';
+    use ErrorContentNegotiationTrait;
+    use ContentTypeNegotiationTrait;
 
-    protected Services $services;
-    protected Session $session;
+    protected ErrorHandler $errorHandler;
+    protected ViewsHandlerInterface $viewsHandler;
 
-    public function __construct(protected Container $container)
+    /**
+     * The Base Controller
+     *
+     * @param ContainerInterface $container
+     */
+    public function __construct(protected ContainerInterface $container)
     {
-        $this->session = $this->container->sessionHandler();
-        $this->services = $this->container->services();
+        $this->errorHandler = $this->container->getErrorHandler();
+        $this->viewsHandler = $this->container->getViewsHandler();
     }
 
     /**
-     * Get a proper response content type
+     * Perform content negotiation for the current HTTP response
      *
-     * @param RequestInterface $request
-     * @return string
+     * @param ServerRequestInterface $request
+     * @param HttpResponse $response
+     * @return void
      */
-    private function getResponseContentType(RequestInterface $request): string
+    protected function negotiateOutputContent(ServerRequestInterface $request, HttpResponse &$response): void
     {
-        // TODO: perform content negotiation here (e.g. request as json, output as xml)
-        $requestContentType = $request->getHeader(strtolower(self::KEY_ACCEPT));
-
-        return empty($requestContentType)
-            ? Router::DEFAULT_ACCEPT_HEADER
-            : ($requestContentType[0] ?? Router::DEFAULT_ACCEPT_HEADER);
+        // TODO: run content negotiation here (use a service)
     }
 
     /**
-     * Send an HTTP response
+     * Respond as JSON
      *
-     * @param string|array $body
-     * @param int $status
-     * @param RequestInterface $request
-     * @return HttpResponse
-     * @throws Exception
+     * @param ResponseInterface $response
+     * @param array $data
+     * @return ResponseInterface
      */
-    protected function respond(string|array $body, int $status, RequestInterface $request): HttpResponse
+    protected function json(ResponseInterface $response, array $data = []): ResponseInterface
     {
-        $headers[self::KEY_CONTENT_TYPE] = $this->getResponseContentType($request);
-        $contents = is_array($body) ? json_encode($body) : $body;
-        return (new HttpResponse($contents, $status, $headers))->send();
+        $response->withBody(json_encode($data) ?? '{}');
+        return $response;
+    }
+
+    protected function view(string $name, ResponseInterface $response, array $data = []): ResponseInterface
+    {
+        $body = $this->viewsHandler->render($name, $data);
+        $response->withBody($body);
+        return $response;
     }
 
     /**
      * @inheritDoc
-     * @throws Exception
      */
-    public function notFoundAction(RequestInterface $request): HttpResponse
+    public function notFoundAction(ServerRequestInterface $request, HttpResponseAdapterInterface $response): ResponseInterface
     {
-        $output = '404 Not found';
-        return $this->respond($output, 404, $request);
+        $arguments = $request->getQueryParams();
+        $keySegment = $arguments['keySegment'];
+
+        if ($keySegment === Router::SEGMENT_WEB) {
+            return $this->view('error/404', $response);
+        }
+
+        $response->withBody(match ($response->getHeader(Router::CONTENT_TYPE)) {
+            Router::ACCEPTABLE_CONTENT_TYPES[1], Router::ACCEPTABLE_CONTENT_TYPES[2] => $this->getErrorAsXml(array_values(Router::ERROR_DETAIL_404)),
+            Router::ACCEPTABLE_CONTENT_TYPES[3] => $this->getErrorAsJson(array_values(Router::ERROR_DETAIL_404))
+        });
+
+        return $response;
+    }
+
+    /**
+     * Get a string version of this object
+     *
+     * @return string
+     */
+    public function __toString()
+    {
+        return get_class($this);
     }
 }
