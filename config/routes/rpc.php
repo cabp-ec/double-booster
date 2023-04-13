@@ -1,6 +1,6 @@
 <?php
 
-// .com/api/c/{version}
+// Example: .com/api/c/{version}
 
 return [
     '/{version}' => [
@@ -11,19 +11,19 @@ return [
             'pipeline' => 'ROUTE',
         ],
     ],
-    '/{version}/state' => [
+    '/{version}/demo/state' => [
         'GET' => [
             'protected' => false,
             'controller' => 'State',
-            'action' => 'get',
+            'action' => 'demoState',
             'pipeline' => 'ROUTE',
         ],
     ],
-    '/{version}/state/{processGroup}' => [
-        'GET' => [
+    '/{version}/contact' => [
+        'POST' => [
             'protected' => false,
             'controller' => 'State',
-            'action' => 'get',
+            'action' => 'contact',
             'pipeline' => 'ROUTE',
         ],
     ],

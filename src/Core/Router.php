@@ -9,6 +9,7 @@ use App\Core\Interfaces\HttpResponseAdapterInterface;
 use App\Core\Traits\ContentTypeNegotiationTrait;
 use App\Factories\ControllerFactory;
 use Laminas\Diactoros\ServerRequestFactory;
+use Psr\Http\Message\ResponseInterface;
 
 final class Router extends ConfigReceptor
 {
@@ -17,10 +18,11 @@ final class Router extends ConfigReceptor
     private const ACTION_SUFFIX = 'actionSuffix';
     private const KEY_REST_ACTIONS = 'restActions';
     private const VERSION_URI = '/{version}';
-    private const HTTP_METHOD_GET = 'GET';
-    private const HTTP_METHOD_POST = 'POST';
-    private const HTTP_METHOD_PUT = 'PUT';
-    private const HTTP_METHOD_DELETE = 'DELETE';
+    public const HTTP_METHOD_GET = 'GET';
+    public const HTTP_METHOD_POST = 'POST';
+    public const HTTP_METHOD_PUT = 'PUT';
+    public const HTTP_METHOD_DELETE = 'DELETE';
+    public const HTTP_METHOD_OPTIONS = 'OPTIONS';
     private const REST_OP_C = 'create';
     private const REST_OP_R = 'read';
     private const REST_OP_U = 'update';
@@ -212,16 +214,25 @@ final class Router extends ConfigReceptor
      *
      * @param string $groupKey
      * @param string $uri
+     * @param string $requestMethod
      * @param bool $routeFound
      * @return array
      */
-    private function findRouteDefinition(string $groupKey, string $uri, bool &$routeFound): array
+    private function findRouteDefinition(string $groupKey, string $uri, string $requestMethod, bool &$routeFound): array
     {
         $uriKeys = array_keys($this->routes[$groupKey]);
         $groupKeyFirst = substr($groupKey, 0, 1);
 
         if (in_array($uri, $uriKeys)) { // found exact match
-            return $this->routes[$groupKey][$uri];
+            $definitionDetail = $this->routes[$groupKey][$uri][$requestMethod] ?? [];
+            return array_merge_recursive(
+                [
+                    'uriRest' => $uri,
+                    'uriDefinition' => $uri,
+                    'groupKey' => $groupKey,
+                ],
+                $definitionDetail
+            );
         }
 
         $segments = explode('/', strtolower($uri));
@@ -348,24 +359,30 @@ final class Router extends ConfigReceptor
         $uri = $payload->getUri();
         $groupKey = $this->getRouteKeySegment($uri);
         $routeFound = true;
-        $routeDefinition = $this->findRouteDefinition($groupKey, $uri, $routeFound);
+
+        $routeDefinition = $this->findRouteDefinition(
+            $groupKey,
+            $uri,
+            $payload->getRequestMethod(),
+            $routeFound
+        );
+
         $arguments = array_merge(
             ['keySegment' => $groupKey],
             $routeFound
                 ? $this->getUriParams($routeDefinition['uriDefinition'], $routeDefinition['uriRest'])
                 : []
         );
-        $serverRequest = ServerRequestFactory::fromGlobals([], $arguments, $payload->getPostedData(), [], []);
+
+        $serverRequest = ServerRequestFactory::fromGlobals($_SERVER, $arguments, $payload->getPostedData(), [], []);
         $controller = $this->getController($groupKey, $routeDefinition);
         $controllerAction = $this->getControllerAction($controller, $routeDefinition['action'], $routeFound);
-        $response = $this->middlewareHandler->run($routeDefinition['pipeline'], $serverRequest);
 
 //        echo '<pre>';
-//        echo 'Router<br>';
 //        var_dump($controllerAction);
-//        var_dump($controller);
 //        exit;
 
+        $response = $this->middlewareHandler->run($routeDefinition['pipeline'], $serverRequest);
         return $controller->$controllerAction($serverRequest, $response);
     }
 }

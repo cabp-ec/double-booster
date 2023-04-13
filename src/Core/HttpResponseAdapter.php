@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Core;
 
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamInterface;
 use App\Core\Traits\ContentTypeNegotiationTrait;
@@ -13,19 +14,20 @@ class HttpResponseAdapter implements HttpResponseAdapterInterface
 {
     use ContentTypeNegotiationTrait;
 
-    private HttpResponse $response;
+    public const HEADER_CONTENT_TYPE = 'Content-Type';
+
+    private ResponseInterface $response;
 
     /**
      * HttpResponseAdapter is an adapter for the HTTP ResponseInterface
      *
      * @param ServerRequestInterface $request
-     * @param int $status
+     * @param ResponseInterface $response
      */
-    public function __construct(ServerRequestInterface $request, int $status = 200)
+    public function __construct(ServerRequestInterface $request, ResponseInterface $response)
     {
-        $this->response = new HttpResponse();
-        $this->withStatus($status)
-            ->withHeader(Router::CONTENT_TYPE, $this->getResponseContentType($request));
+        $this->response = $response;
+        $this->withHeader(Router::CONTENT_TYPE, $this->getResponseContentType($request));
     }
 
     /** @inheritDoc */
@@ -122,8 +124,30 @@ class HttpResponseAdapter implements HttpResponseAdapterInterface
 
     public function send(): static
     {
-        $this->response->send();
+        self::sendResponse($this->response);
 
         return $this;
+    }
+
+    /**
+     * Send the given response as is
+     *
+     * @param ResponseInterface $response
+     * @return void
+     */
+    static public function sendResponse(ResponseInterface $response): void
+    {
+        $headers = $response->getHeaders();
+        $statusCode = $response->getStatusCode();
+
+        foreach ($headers as $name => $value) {
+            $replace = 0 === strcasecmp($name, self::HEADER_CONTENT_TYPE);
+            header($name . ': ' . $value[0], $replace, $statusCode);
+        }
+
+        $version = $response->getProtocolVersion();
+        $statusText = $response->getReasonPhrase();
+        header(sprintf('HTTP/%s %s %s', $version, $statusCode, $statusText), true, $statusCode);
+        echo $response->getBody();
     }
 }

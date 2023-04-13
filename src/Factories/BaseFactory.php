@@ -12,7 +12,7 @@ abstract class BaseFactory implements Countable, FactoryInterface
     /**
      * @inheritDoc
      */
-    abstract public function get(string $name): object;
+    abstract public function get(string $name): ?object;
 
     /**
      * Create an object

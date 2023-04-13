@@ -1,5 +1,5 @@
 {
-  "name": "cabp/website",
+  "name": "cabp/parallel-booster",
   "description": "Carlos's Website",
   "keywords": [
     "php",
@@ -27,11 +27,10 @@
   },
   "require": {
     "php": ">=8.2.0",
-    "laminas/laminas-diactoros": "^2.24",
-    "psr/http-server-middleware": "^1.0",
-    "relay/relay": "^2.1",
-    "twig/twig": "^3.5",
-    "vlucas/phpdotenv": "^5.5"
+    "laminas/laminas-diactoros": "2.24",
+    "psr/http-server-middleware": "1.0",
+    "relay/relay": "2.1",
+    "vlucas/phpdotenv": "5.5"
   },
   "config": {
     "preferred-install": "dist",

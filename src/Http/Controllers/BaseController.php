@@ -60,10 +60,19 @@ abstract class BaseController implements HttpControllerInterface
         return $response;
     }
 
-    protected function view(string $name, ResponseInterface $response, array $data = []): ResponseInterface
+    /**
+     * Respond with an HTML page
+     *
+     * @param string $name
+     * @param HttpResponseAdapterInterface $response
+     * @param array $data
+     * @return ResponseInterface
+     */
+    protected function view(string $name, HttpResponseAdapterInterface $response, array $data = []): ResponseInterface
     {
         $body = $this->viewsHandler->render($name, $data);
         $response->withBody($body);
+
         return $response;
     }
 
@@ -79,10 +88,12 @@ abstract class BaseController implements HttpControllerInterface
             return $this->view('error/404', $response);
         }
 
-        $response->withBody(match ($response->getHeader(Router::CONTENT_TYPE)) {
-            Router::ACCEPTABLE_CONTENT_TYPES[1], Router::ACCEPTABLE_CONTENT_TYPES[2] => $this->getErrorAsXml(array_values(Router::ERROR_DETAIL_404)),
-            Router::ACCEPTABLE_CONTENT_TYPES[3] => $this->getErrorAsJson(array_values(Router::ERROR_DETAIL_404))
-        });
+        /** @var string $responseContentType */
+        $responseContentType = $response->getHeader(Router::CONTENT_TYPE);
+        $response->withBody($this->getErrorContent(
+            $responseContentType,
+            array_values(Router::ERROR_DETAIL_404)
+        ));
 
         return $response;
     }

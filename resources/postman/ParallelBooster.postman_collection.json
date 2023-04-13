@@ -1,0 +1,144 @@
+{
+	"info": {
+		"_postman_id": "420a04b5-4510-4c4a-b5f1-6bdc9d5d6876",
+		"name": "Parallel Booster",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "26883129"
+	},
+	"item": [
+		{
+			"name": "Demo State - OPTIONS",
+			"request": {
+				"method": "OPTIONS",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept-Encoding",
+						"value": "gzip, deflate"
+					},
+					{
+						"key": "Accept-Language",
+						"value": "en-US,en;q=0.5"
+					},
+					{
+						"key": "Connection",
+						"value": "keep-alive"
+					},
+					{
+						"key": "Origin",
+						"value": "http://parallel-booster.local"
+					},
+					{
+						"key": "Referer",
+						"value": "http://parallel-booster.local/"
+					}
+				],
+				"url": {
+					"raw": "http://parallel-booster.local/api/c/1/state",
+					"protocol": "http",
+					"host": [
+						"parallel-booster",
+						"local"
+					],
+					"path": [
+						"api",
+						"c",
+						"1",
+						"state"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Demo State",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept-Encoding",
+						"value": "gzip, deflate"
+					},
+					{
+						"key": "Accept-Language",
+						"value": "en-US,en;q=0.5"
+					},
+					{
+						"key": "Origin",
+						"value": "http://parallel-booster.local"
+					}
+				],
+				"url": {
+					"raw": "http://parallel-booster.local/api/c/1/demo/state",
+					"protocol": "http",
+					"host": [
+						"parallel-booster",
+						"local"
+					],
+					"path": [
+						"api",
+						"c",
+						"1",
+						"demo",
+						"state"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Simple POST",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept-Encoding",
+						"value": "gzip, deflate"
+					},
+					{
+						"key": "Accept-Language",
+						"value": "en-US,en;q=0.5"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Origin",
+						"value": "http://parallel-booster.local"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"name\": \"Joe Biden\",\n\t\"email\": \"potus@us.gov\",\n\t\"contactType\": \"services\"\n}"
+				},
+				"url": {
+					"raw": "http://parallel-booster.local/api/c/1/contact",
+					"protocol": "http",
+					"host": [
+						"parallel-booster",
+						"local"
+					],
+					"path": [
+						"api",
+						"c",
+						"1",
+						"contact"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

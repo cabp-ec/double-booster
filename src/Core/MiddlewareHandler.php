@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Core;
 
+use App\Core\Interfaces\HttpResponseAdapterInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Relay\Relay;
@@ -89,14 +90,14 @@ final class MiddlewareHandler
      *
      * @param string $pipelineName
      * @param ServerRequestInterface $request
-     * @return ResponseInterface
+     * @return HttpResponseAdapterInterface
      */
-    public function run(string $pipelineName, ServerRequestInterface $request): ResponseInterface
+    public function run(string $pipelineName, ServerRequestInterface $request): HttpResponseAdapterInterface
     {
         $pipeline = $this->makePipeline($pipelineName);
         $pipeline[] = new ControllerMiddleware();
         $relay = new Relay($pipeline);
 
-        return $relay->handle($request);
+        return new HttpResponseAdapter($request, $relay->handle($request));
     }
 }

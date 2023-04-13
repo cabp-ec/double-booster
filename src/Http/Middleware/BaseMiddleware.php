@@ -9,6 +9,8 @@ use App\Core\Interfaces\AppMiddlewareInterface;
 use App\Core\Router;
 use App\Core\Traits\ContentTypeNegotiationTrait;
 use App\Core\Traits\ErrorContentNegotiationTrait;
+use Laminas\Diactoros\Response as LaminasResponse;
+use Psr\Http\Message\ResponseInterface;
 
 abstract class BaseMiddleware implements AppMiddlewareInterface
 {
@@ -31,10 +33,12 @@ abstract class BaseMiddleware implements AppMiddlewareInterface
      * @param int $status
      * @return HttpResponse
      */
-    protected function getErrorResponse(string $type, string $contentType, int $status): HttpResponse
+    protected function getErrorResponse(string $type, string $contentType, int $status): ResponseInterface
     {
-        $response = new HttpResponse();
-        $response->writeBody($this->getErrorBody($type, $contentType));
+        $response = (new LaminasResponse())->withStatus($status)
+            ->withHeader(HttpResponse::HEADER_CONTENT_TYPE, $contentType)
+            ->getBody()->write($this->getErrorBody($type, $contentType));
+//        $response = $response->withBody($this->getErrorBody($type, $contentType));
 
         return $response
             ->withHeader(HttpResponse::HEADER_CONTENT_TYPE, $contentType)

@@ -4,11 +4,6 @@ declare(strict_types=1);
 
 namespace App\Core;
 
-use Twig\Environment as TwigEnvironment;
-use Twig\Error\LoaderError;
-use Twig\Error\RuntimeError;
-use Twig\Error\SyntaxError;
-use Twig\Loader\FilesystemLoader;
 use App\Core\Interfaces\ViewsHandlerInterface;
 use App\Core\Traits\ErrorContentNegotiationTrait;
 
@@ -16,7 +11,7 @@ class ViewsHandler implements ViewsHandlerInterface
 {
     use ErrorContentNegotiationTrait;
 
-    private ?TwigEnvironment $engine = null;
+    private ?object $engine = null;
 
     /**
      * A generic views handler
@@ -24,18 +19,23 @@ class ViewsHandler implements ViewsHandlerInterface
      * @param string $templatesPath
      * @param string $ext
      */
-    public function __construct(string $templatesPath, private readonly string $ext = 'twig')
+    public function __construct(string $templatesPath, private readonly string $ext = 'html')
     {
-        $loader = new FilesystemLoader($templatesPath);
-        $this->engine = new TwigEnvironment($loader);
+        // TODO: setup your preferred template engine here
+        // Example: $this->engine = new TwigEnvironment($loader);
+    }
+
+    private function renderRaw(array $values): string
+    {
+        $title = array_shift($values);
+        $valueBody = '<h2>' . $title . '</h2>';
+        $valueBody .= '<p>' . implode('</p><p>', $values) . '</p>';
+
+        return '<section>' . $valueBody . '</section>';
     }
 
     /**
      * @inheritDoc
-     *
-     * @throws SyntaxError
-     * @throws RuntimeError
-     * @throws LoaderError
      */
     public function render(string $view, array $data = [], string $template = 'default'): string
     {
@@ -45,6 +45,6 @@ class ViewsHandler implements ViewsHandlerInterface
             return $this->engine->render($view . '.' . $this->ext, $data);
         }
 
-        return $this->getErrorAsHtml(array_values(Router::ERROR_DETAIL_404));
+        return $this->renderRaw($data);
     }
 }

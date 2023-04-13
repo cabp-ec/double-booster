@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Core;
 
+use App\Core\Interfaces\HttpResponseAdapterInterface;
 use Laminas\Diactoros\Response as LaminasResponse;
 
-class HttpResponse extends LaminasResponse
+class HttpResponse extends LaminasResponse implements HttpResponseAdapterInterface
 {
     public const HEADER_ACCEPT = 'Accept';
     public const HEADER_CONTENT_TYPE = 'Content-Type';

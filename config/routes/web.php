@@ -1,7 +1,7 @@
 <?php
 
-// TODO: upgrade and ENUMS to specify HTTP methods and middleware pipelines
-// TODO: implement protected routes
+// TODO: Upgrade route definitions to use ENUMS to specify HTTP methods and middleware pipelines
+// TODO: Implement protected routes
 
 return [
     '/' => [
@@ -9,30 +9,6 @@ return [
             'protected' => false,
             'controller' => 'Index',
             'action' => 'index',
-            'pipeline' => 'ROUTE',
-        ],
-    ],
-    '/content-index' => [
-        'GET' => [
-            'protected' => false,
-            'controller' => 'Index',
-            'action' => 'contentIndex',
-            'pipeline' => 'ROUTE',
-        ],
-    ],
-    '/books' => [
-        'GET' => [
-            'protected' => false,
-            'controller' => 'Index',
-            'action' => 'booksIndex',
-            'pipeline' => 'ROUTE',
-        ],
-    ],
-    '/books/{friendlyName}' => [
-        'GET' => [
-            'protected' => false,
-            'controller' => 'Index',
-            'action' => 'bookDetail',
             'pipeline' => 'ROUTE',
         ],
     ],
@@ -44,11 +20,11 @@ return [
             'pipeline' => 'ROUTE',
         ],
     ],
-    '/articles/{friendlyName}' => [
+    '/articles/{title}' => [
         'GET' => [
             'protected' => false,
             'controller' => 'Index',
-            'action' => 'articleRead',
+            'action' => 'postRead',
             'pipeline' => 'ROUTE',
         ],
     ],
