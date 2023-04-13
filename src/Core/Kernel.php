@@ -22,7 +22,7 @@ final class Kernel
     /**
      * Launch Phase, the start-up point for the framework
      */
-    private function __construct()
+    public function __construct()
     {
         $ds = DIRECTORY_SEPARATOR;
         $this->basePath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR;
@@ -116,20 +116,5 @@ final class Kernel
     public function __wakeup()
     {
         throw new Exception('Can\'t wake up');
-    }
-
-    /**
-     * Get the only instance of this class
-     *
-     * @return Kernel
-     */
-    static public function instance(): Kernel
-    {
-        if (null !== self::$instance) {
-            return self::$instance;
-        }
-
-        self::$instance = new Kernel();
-        return self::$instance;
     }
 }

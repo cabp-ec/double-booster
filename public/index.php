@@ -15,5 +15,5 @@ require_once('../vendor/autoload.php');
  * the Extended Operations Phase"
  */
 
-$app = Kernel::instance();
+$app = new Kernel();
 $app->liftOf();
